@@ -260,6 +260,14 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
+    async sendCommandSetFloodScope(transportKey) {
+        const data = new BufferWriter();
+        data.writeByte(Constants.CommandCodes.SetFloodScope);
+        data.writeByte(0); // not documented, protocol version 8 checks if it's zero, else returns ERR_CODE_UNSUPPORTED_CMD
+        data.writeBytes(transportKey);
+        await this.sendToRadioFrame(data.toBytes());
+    }
+
     async sendCommandGetChannel(channelIdx) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.GetChannel);
@@ -1759,6 +1767,41 @@ class Connection extends EventEmitter {
                 reject(e);
             }
         });
+    }
+
+    setFloodScope(transportKey) {
+        return new Promise(async (resolve, reject) => {
+            try {
+
+                // resolve promise when we receive ok
+                const onOk = (response) => {
+                    this.off(Constants.ResponseCodes.Ok, onOk);
+                    this.off(Constants.ResponseCodes.Err, onErr);
+                    resolve(response);
+                }
+
+                // reject promise when we receive err
+                const onErr = () => {
+                    this.off(Constants.ResponseCodes.Ok, onOk);
+                    this.off(Constants.ResponseCodes.Err, onErr);
+                    reject();
+                }
+
+                // listen for events
+                this.once(Constants.ResponseCodes.Ok, onOk);
+                this.once(Constants.ResponseCodes.Err, onErr);
+
+                // send set flood scope
+                await this.sendCommandSetFloodScope(transportKey);
+
+            } catch(e) {
+                reject(e);
+            }
+        });
+    }
+
+    clearFloodScope() {
+        return this.setFloodScope([]);
     }
 
     // @deprecated migrate to using tracePath instead. pingRepeaterZeroHop will be removed in a future update

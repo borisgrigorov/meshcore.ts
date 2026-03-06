@@ -52,6 +52,8 @@ class Constants {
         SendTelemetryReq: 39,
 
         SendBinaryReq: 50,
+
+        SetFloodScope: 54,
     }
 
     static ResponseCodes = {
