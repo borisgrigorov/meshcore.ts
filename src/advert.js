@@ -7,6 +7,7 @@ class Advert {
     static ADV_TYPE_CHAT = 1;
     static ADV_TYPE_REPEATER = 2;
     static ADV_TYPE_ROOM = 3;
+    static ADV_TYPE_SENSOR = 4;
 
     static ADV_LATLON_MASK = 0x10;
     static ADV_FEAT1_MASK = 0x20;
@@ -49,6 +50,8 @@ class Advert {
         if(type === Advert.ADV_TYPE_CHAT) return "CHAT";
         if(type === Advert.ADV_TYPE_REPEATER) return "REPEATER";
         if(type === Advert.ADV_TYPE_ROOM) return "ROOM";
+        if(type === Advert.ADV_TYPE_SENSOR) return "SENSOR";
+        
         return null;
     }
 
