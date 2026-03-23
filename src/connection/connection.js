@@ -268,6 +268,17 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
+    async sendCommandSendChannelData(channelIdx, pathLen, path, dataType, payload) {
+        const data = new BufferWriter();
+        data.writeByte(Constants.CommandCodes.SendChannelData);
+        data.writeByte(channelIdx);
+        data.writeByte(pathLen);
+        data.writeBytes(path);
+        data.writeUInt16LE(dataType);
+        data.writeBytes(payload);
+        await this.sendToRadioFrame(data.toBytes());
+    }
+
     async sendCommandGetChannel(channelIdx) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.GetChannel);
@@ -366,6 +377,8 @@ class Connection extends EventEmitter {
             this.onSignStartResponse(bufferReader);
         } else if(responseCode === Constants.ResponseCodes.Signature){
             this.onSignatureResponse(bufferReader);
+        } else if(responseCode === Constants.ResponseCodes.ChannelDataRecv){
+            this.onChannelDataRecvResponse(bufferReader);
         } else if(responseCode === Constants.PushCodes.Advert){
             this.onAdvertPush(bufferReader);
         } else if(responseCode === Constants.PushCodes.PathUpdated){
@@ -609,6 +622,27 @@ class Connection extends EventEmitter {
     onSignatureResponse(bufferReader) {
         this.emit(Constants.ResponseCodes.Signature, {
             signature: bufferReader.readBytes(64),
+        });
+    }
+
+    onChannelDataRecvResponse(bufferReader) {
+        const snr = bufferReader.readInt8() / 4;
+        const reserved1 = bufferReader.readByte();
+        const reserved2 = bufferReader.readByte();
+        const channelIdx = bufferReader.readInt8();
+        const pathLen = bufferReader.readByte(); // 0xFF if was sent direct, otherwise path_len for flood-mode
+        const dataType = bufferReader.readUInt16LE();
+        const dataLen = bufferReader.readUInt8();
+        const data = bufferReader.readBytes(dataLen);
+        this.emit(Constants.ResponseCodes.ChannelDataRecv, {
+            snr: snr,
+            reserved1: reserved1,
+            reserved2: reserved2,
+            channelIdx: channelIdx,
+            pathLen: pathLen,
+            dataType: dataType,
+            dataLen: dataLen,
+            data: data,
         });
     }
 
@@ -971,6 +1005,7 @@ class Connection extends EventEmitter {
             const onContactMessageReceived = (message) => {
                 this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
+                this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
                 this.off(Constants.ResponseCodes.NoMoreMessages, onNoMoreMessagesReceived);
                 resolve({
                     contactMessage: message,
@@ -981,9 +1016,21 @@ class Connection extends EventEmitter {
             const onChannelMessageReceived = (message) => {
                 this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
+                this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
                 this.off(Constants.ResponseCodes.NoMoreMessages, onNoMoreMessagesReceived);
                 resolve({
                     channelMessage: message,
+                });
+            }
+
+            // resolve promise when we receive channel data
+            const onChannelDataReceived = (message) => {
+                this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
+                this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
+                this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
+                this.off(Constants.ResponseCodes.NoMoreMessages, onNoMoreMessagesReceived);
+                resolve({
+                    channelData: message,
                 });
             }
 
@@ -991,6 +1038,7 @@ class Connection extends EventEmitter {
             const onNoMoreMessagesReceived = () => {
                 this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
+                this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
                 this.off(Constants.ResponseCodes.NoMoreMessages, onNoMoreMessagesReceived);
                 resolve(null);
             }
@@ -998,6 +1046,7 @@ class Connection extends EventEmitter {
             // listen for events
             this.once(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
             this.once(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
+            this.once(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
             this.once(Constants.ResponseCodes.NoMoreMessages, onNoMoreMessagesReceived);
 
             // sync next message from device
@@ -1800,6 +1849,37 @@ class Connection extends EventEmitter {
 
                 // send set flood scope
                 await this.sendCommandSetFloodScope(transportKey);
+
+            } catch(e) {
+                reject(e);
+            }
+        });
+    }
+
+    sendChannelData(channelIdx, pathLen, path, dataType, payload) {
+        return new Promise(async (resolve, reject) => {
+            try {
+
+                // resolve promise when we receive ok
+                const onOk = (response) => {
+                    this.off(Constants.ResponseCodes.Ok, onOk);
+                    this.off(Constants.ResponseCodes.Err, onErr);
+                    resolve(response);
+                }
+
+                // reject promise when we receive err
+                const onErr = () => {
+                    this.off(Constants.ResponseCodes.Ok, onOk);
+                    this.off(Constants.ResponseCodes.Err, onErr);
+                    reject();
+                }
+
+                // listen for events
+                this.once(Constants.ResponseCodes.Ok, onOk);
+                this.once(Constants.ResponseCodes.Err, onErr);
+
+                // send channel data
+                await this.sendCommandSendChannelData(channelIdx, pathLen, path, dataType, payload);
 
             } catch(e) {
                 reject(e);

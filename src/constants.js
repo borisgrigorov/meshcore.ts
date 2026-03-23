@@ -54,6 +54,8 @@ class Constants {
         SendBinaryReq: 50,
 
         SetFloodScope: 54,
+
+        SendChannelData: 62,
     }
 
     static ResponseCodes = {
@@ -76,6 +78,7 @@ class Constants {
         ChannelInfo: 18,
         SignStart: 19,
         Signature: 20,
+        ChannelDataRecv: 27,
     }
 
     static PushCodes = {
