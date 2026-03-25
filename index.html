@@ -128,6 +128,15 @@
                 <button @click="setManualAddContacts" class="border border-gray-500 px-2 bg-gray-100 hover:bg-gray-200 rounded">
                     setManualAddContacts
                 </button>
+                <button @click="getStatsCore" class="border border-gray-500 px-2 bg-gray-100 hover:bg-gray-200 rounded">
+                    getStatsCore
+                </button>
+                <button @click="getStatsRadio" class="border border-gray-500 px-2 bg-gray-100 hover:bg-gray-200 rounded">
+                    getStatsRadio
+                </button>
+                <button @click="getStatsPackets" class="border border-gray-500 px-2 bg-gray-100 hover:bg-gray-200 rounded">
+                    getStatsPackets
+                </button>
             </div>
         </div>
 
@@ -670,6 +679,30 @@
                 } catch(e) {
                     console.log(e);
                     alert("failed to set manual add contacts");
+                }
+            },
+            async getStatsCore() {
+                try {
+                    const stats = await this.connection.getStatsCore();
+                    console.log(stats);
+                } catch(e) {
+                    console.log(e);
+                }
+            },
+            async getStatsRadio() {
+                try {
+                    const stats = await this.connection.getStatsRadio();
+                    console.log(stats);
+                } catch(e) {
+                    console.log(e);
+                }
+            },
+            async getStatsPackets() {
+                try {
+                    const stats = await this.connection.getStatsPackets();
+                    console.log(stats);
+                } catch(e) {
+                    console.log(e);
                 }
             },
             showCommandLine(contact) {

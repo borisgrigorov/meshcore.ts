@@ -17,6 +17,12 @@ class Constants {
         Dev: 0xFFFF, // developer namespace for experimenting with group/channel datagrams and building apps
     }
 
+    static StatsTypes = {
+        Core: 0,
+        Radio: 1,
+        Packets: 2,
+    }
+
     static CommandCodes = {
         AppStart: 1,
         SendTxtMsg: 2,
@@ -59,6 +65,8 @@ class Constants {
 
         SetFloodScope: 54,
 
+        GetStats: 56,
+
         SendChannelData: 62,
     }
 
@@ -82,6 +90,7 @@ class Constants {
         ChannelInfo: 18,
         SignStart: 19,
         Signature: 20,
+        Stats: 24,
         ChannelDataRecv: 27,
     }
 

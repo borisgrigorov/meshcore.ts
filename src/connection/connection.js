@@ -268,6 +268,13 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
+    async sendCommandGetStats(statsType) {
+        const data = new BufferWriter();
+        data.writeByte(Constants.CommandCodes.GetStats);
+        data.writeByte(statsType);
+        await this.sendToRadioFrame(data.toBytes());
+    }
+
     async sendCommandSendChannelData(channelIdx, pathLen, path, dataType, payload) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendChannelData);
@@ -377,6 +384,8 @@ class Connection extends EventEmitter {
             this.onSignStartResponse(bufferReader);
         } else if(responseCode === Constants.ResponseCodes.Signature){
             this.onSignatureResponse(bufferReader);
+        } else if(responseCode === Constants.ResponseCodes.Stats){
+            this.onStatsResponse(bufferReader);
         } else if(responseCode === Constants.ResponseCodes.ChannelDataRecv){
             this.onChannelDataRecvResponse(bufferReader);
         } else if(responseCode === Constants.PushCodes.Advert){
@@ -623,6 +632,47 @@ class Connection extends EventEmitter {
         this.emit(Constants.ResponseCodes.Signature, {
             signature: bufferReader.readBytes(64),
         });
+    }
+
+    onStatsResponse(bufferReader) {
+
+        const type = bufferReader.readUInt8();
+        const raw = bufferReader.readRemainingBytes();
+        const rawBufferReader = new BufferReader(raw);
+
+        var data = {};
+        if(type === Constants.StatsTypes.Core){
+            data = {
+                batteryMilliVolts: rawBufferReader.readUInt16LE(),
+                uptimeSecs: rawBufferReader.readUInt32LE(),
+                queueLen: rawBufferReader.readUInt8(),
+            };
+        } else if(type === Constants.StatsTypes.Radio){
+            data = {
+                noiseFloor: rawBufferReader.readInt16LE(),
+                lastRssi: rawBufferReader.readInt8(),
+                lastSnr: rawBufferReader.readInt8() / 4,
+                txAirSecs: rawBufferReader.readUInt32LE(),
+                rxAirSecs: rawBufferReader.readUInt32LE(),
+            };
+        } else if(type === Constants.StatsTypes.Packets){
+            data = {
+                recv: rawBufferReader.readUInt32LE(),
+                sent: rawBufferReader.readUInt32LE(),
+                nSentFlood: rawBufferReader.readUInt32LE(),
+                nSentDirect: rawBufferReader.readUInt32LE(),
+                nRecvFlood: rawBufferReader.readUInt32LE(),
+                nRecvDirect: rawBufferReader.readUInt32LE(),
+                nRecvErrors: rawBufferReader.getRemainingBytesCount() >= 4 ? rawBufferReader.readUInt32LE() : null,
+            };
+        }
+
+        this.emit(Constants.ResponseCodes.Stats, {
+            type: type,
+            raw: raw,
+            data: data,
+        });
+
     }
 
     onChannelDataRecvResponse(bufferReader) {
@@ -1854,6 +1904,56 @@ class Connection extends EventEmitter {
                 reject(e);
             }
         });
+    }
+
+    getStats(statsType) {
+        return new Promise(async (resolve, reject) => {
+            try {
+
+                // resolve promise when we receive stats
+                const onStats = (response) => {
+
+                    // make sure stats response is for this stats request
+                    if(response.type !== statsType){
+                        return;
+                    }
+
+                    this.off(Constants.ResponseCodes.Stats, onStats);
+                    this.off(Constants.ResponseCodes.Err, onErr);
+                    resolve(response);
+
+                }
+
+                // reject promise when we receive err
+                const onErr = () => {
+                    this.off(Constants.ResponseCodes.Stats, onStats);
+                    this.off(Constants.ResponseCodes.Err, onErr);
+                    reject();
+                }
+
+                // listen for events
+                this.once(Constants.ResponseCodes.Stats, onStats);
+                this.once(Constants.ResponseCodes.Err, onErr);
+
+                // send get stats
+                await this.sendCommandGetStats(statsType);
+
+            } catch(e) {
+                reject(e);
+            }
+        });
+    }
+
+    getStatsCore() {
+        return this.getStats(Constants.StatsTypes.Core);
+    }
+
+    getStatsRadio() {
+        return this.getStats(Constants.StatsTypes.Radio);
+    }
+
+    getStatsPackets() {
+        return this.getStats(Constants.StatsTypes.Packets);
     }
 
     sendChannelData(channelIdx, pathLen, path, dataType, payload) {
