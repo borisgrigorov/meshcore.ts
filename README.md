@@ -1,4 +1,6 @@
-# MeshCore.js
+# MeshCore.ts
+
+> This is a fork of [MeshCore.js](https://github.com/meshcore-dev/meshcore.js) with TypeScript type definitions for most of the library. The original JavaScript version is still available and maintained at the same repository.
 
 A Javascript library for interacting with a [MeshCore](https://github.com/meshcore-dev/MeshCore) device running the [Companion Radio Firmware](https://github.com/meshcore-dev/MeshCore/blob/main/examples/companion_radio/main.cpp).
 
