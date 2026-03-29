@@ -30,7 +30,7 @@ class CayenneLpp {
     static LPP_SWITCH = 142;              // 1 byte, 0/1
     static LPP_POLYLINE = 240;            // 1 byte size, 1 byte delta factor, 3 byte lon/lat 0.0001° * factor, n (size-8) bytes deltas
 
-    static parse(bytes) {
+    static parse(bytes: Uint8Array) {
 
         const buffer = new BufferReader(bytes);
         const telemetry = [];

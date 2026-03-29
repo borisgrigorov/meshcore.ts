@@ -2,6 +2,18 @@ import BufferReader from "./buffer_reader.js";
 import BufferWriter from "./buffer_writer.js";
 
 class Advert {
+    publicKey: Uint8Array;
+    timestamp: number;
+    signature: Uint8Array;
+    appData: Uint8Array;
+    public parsed: {
+        type: string | null,
+        lat: number | null,
+        lon: number | null,
+        name: string | null,
+        feat1: number | null,
+        feat2: number | null,
+    };
 
     static ADV_TYPE_NONE = 0;
     static ADV_TYPE_CHAT = 1;
@@ -14,7 +26,7 @@ class Advert {
     static ADV_FEAT2_MASK = 0x40;
     static ADV_NAME_MASK = 0x80;
 
-    constructor(publicKey, timestamp, signature, appData) {
+    constructor(publicKey: Uint8Array, timestamp: number, signature: Uint8Array, appData: Uint8Array) {
         this.publicKey = publicKey;
         this.timestamp = timestamp;
         this.signature = signature;
@@ -22,7 +34,7 @@ class Advert {
         this.parsed = this.parseAppData();
     }
 
-    static fromBytes(bytes) {
+    static fromBytes(bytes: Uint8Array) {
 
         // read bytes
         const bufferReader = new BufferReader(bytes);

@@ -1,4 +1,5 @@
 class BufferWriter {
+    private buffer: number[];
 
     constructor() {
         this.buffer = [];
@@ -8,46 +9,40 @@ class BufferWriter {
         return new Uint8Array(this.buffer);
     }
 
-    writeBytes(bytes) {
-        this.buffer = [
-            ...this.buffer,
-            ...bytes,
-        ];
+    writeBytes(bytes: Uint8Array | number[]) {
+        this.buffer = [...this.buffer, ...bytes];
     }
 
-    writeByte(byte) {
-        this.writeBytes([
-            byte,
-        ]);
+    writeByte(byte: number) {
+        this.writeBytes(new Uint8Array([byte]));
     }
 
-    writeUInt16LE(num) {
+    writeUInt16LE(num: number) {
         const bytes = new Uint8Array(2);
         const view = new DataView(bytes.buffer);
         view.setUint16(0, num, true);
         this.writeBytes(bytes);
     }
 
-    writeUInt32LE(num) {
+    writeUInt32LE(num: number) {
         const bytes = new Uint8Array(4);
         const view = new DataView(bytes.buffer);
         view.setUint32(0, num, true);
         this.writeBytes(bytes);
     }
 
-    writeInt32LE(num) {
+    writeInt32LE(num: number) {
         const bytes = new Uint8Array(4);
         const view = new DataView(bytes.buffer);
         view.setInt32(0, num, true);
         this.writeBytes(bytes);
     }
 
-    writeString(string) {
+    writeString(string: string) {
         this.writeBytes(new TextEncoder().encode(string));
     }
 
-    writeCString(string, maxLength) {
-
+    writeCString(string: string, maxLength: number) {
         // create buffer of max length
         const bytes = new Uint8Array(new ArrayBuffer(maxLength));
 
@@ -55,7 +50,7 @@ class BufferWriter {
         const encodedString = new TextEncoder().encode(string);
 
         // copy in string until we hit the max length, or we run out of string bytes
-        for(var i = 0; i < maxLength && i < encodedString.length; i++){
+        for (var i = 0; i < maxLength && i < encodedString.length; i++) {
             bytes[i] = encodedString[i];
         }
 
@@ -64,9 +59,7 @@ class BufferWriter {
 
         // write to buffer
         this.writeBytes(bytes);
-
     }
-
 }
 
 export default BufferWriter;

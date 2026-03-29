@@ -2,9 +2,11 @@
   "name": "@liamcottle/meshcore.js",
   "version": "1.13.0",
   "description": "",
-  "main": "src/index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "scripts": {
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "Liam Cottle <liam@liamcottle.com>",
@@ -12,5 +14,8 @@
   "dependencies": {
     "@noble/curves": "^1.8.1",
     "serialport": "^13.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
   }
 }

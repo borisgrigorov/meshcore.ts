@@ -1,9 +1,7 @@
 class TransportKeyUtil {
-
-    static async getHashtagRegionKey(regionName) {
-
+    static async getHashtagRegionKey(regionName: string): Promise<Uint8Array> {
         // public hashtag regions must start with #
-        if(!regionName.startsWith("#")){
+        if (!regionName.startsWith("#")) {
             regionName = `#${regionName}`;
         }
 
@@ -11,9 +9,7 @@ class TransportKeyUtil {
         const bytes = new TextEncoder().encode(regionName);
         const hash = await crypto.subtle.digest("SHA-256", bytes);
         return new Uint8Array(hash);
-
     }
-
 }
 
 export default TransportKeyUtil;

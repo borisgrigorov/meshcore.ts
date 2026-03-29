@@ -3,14 +3,17 @@ import HexUtil from "./hex_util.js";
 import Packet from "./packet.js";
 
 class MeshCorePath {
+    private pathHashSize: number;
+    private pathHashCount: number;
+    private pathItems: Uint8Array[];
 
-    constructor(pathHashSize, pathHashCount, pathItems) {
+    constructor(pathHashSize: number, pathHashCount: number, pathItems: Uint8Array[]) {
         this.pathHashSize = pathHashSize;
         this.pathHashCount = pathHashCount;
         this.pathItems = pathItems;
     }
 
-    static fromPathAndLength(path, pathLen) {
+    static fromPathAndLength(path: Uint8Array, pathLen: number) {
 
         // make sure path is valid
         if(pathLen === 0xFF){

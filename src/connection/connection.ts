@@ -5,21 +5,27 @@ import EventEmitter from "../events.js";
 import BufferUtils from "../buffer_utils.js";
 import Packet from "../packet.js";
 import RandomUtils from "../random_utils.js";
+import {
+    Channel,
+    Contact,
+    DeviceInfo,
+    SelfInfo,
+    SendMessageResult,
+    StatusResult,
+    WaitingMessage,
+} from "./types.js";
 
 class Connection extends EventEmitter {
-
     async onConnected() {
-
         // tell device what protocol version we support
         try {
             await this.deviceQuery(Constants.SupportedCompanionProtocolVersion);
-        } catch(e) {
+        } catch (e) {
             // ignore
         }
 
         // tell clients we are connected
         this.emit("connected");
-
     }
 
     onDisconnected() {
@@ -30,11 +36,11 @@ class Connection extends EventEmitter {
         throw new Error("This method must be implemented by the subclass.");
     }
 
-    async sendToRadioFrame(data) {
+    async sendToRadioFrame(data: Uint8Array) {
         throw new Error("This method must be implemented by the subclass.");
     }
 
-    async sendCommandAppStart() {
+    async sendCommandAppStart(): Promise<void> {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.AppStart);
         data.writeByte(1); // appVer
@@ -43,7 +49,13 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendTxtMsg(txtType, attempt, senderTimestamp, pubKeyPrefix, text) {
+    async sendCommandSendTxtMsg(
+        txtType: number,
+        attempt: number,
+        senderTimestamp: number,
+        pubKeyPrefix: Uint8Array,
+        text: string,
+    ) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendTxtMsg);
         data.writeByte(txtType);
@@ -54,7 +66,12 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendChannelTxtMsg(txtType, channelIdx, senderTimestamp, text) {
+    async sendCommandSendChannelTxtMsg(
+        txtType: number,
+        channelIdx: number,
+        senderTimestamp: number,
+        text: string,
+    ) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendChannelTxtMsg);
         data.writeByte(txtType);
@@ -64,10 +81,10 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandGetContacts(since) {
+    async sendCommandGetContacts(since?: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.GetContacts);
-        if(since){
+        if (since) {
             data.writeUInt32LE(since);
         }
         await this.sendToRadioFrame(data.toBytes());
@@ -79,28 +96,38 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetDeviceTime(epochSecs) {
+    async sendCommandSetDeviceTime(epochSecs: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetDeviceTime);
         data.writeUInt32LE(epochSecs);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendSelfAdvert(type) {
+    async sendCommandSendSelfAdvert(type: number): Promise<void> {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendSelfAdvert);
         data.writeByte(type);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetAdvertName(name) {
+    async sendCommandSetAdvertName(name: string) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetAdvertName);
         data.writeString(name);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandAddUpdateContact(publicKey, type, flags, outPathLen, outPath, advName, lastAdvert, advLat, advLon) {
+    async sendCommandAddUpdateContact(
+        publicKey: Uint8Array,
+        type: number,
+        flags: number,
+        outPathLen: number,
+        outPath: Uint8Array,
+        advName: string,
+        lastAdvert: number,
+        advLat: number,
+        advLon: number,
+    ) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.AddUpdateContact);
         data.writeBytes(publicKey);
@@ -121,7 +148,12 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetRadioParams(radioFreq, radioBw, radioSf, radioCr) {
+    async sendCommandSetRadioParams(
+        radioFreq: number,
+        radioBw: number,
+        radioSf: number,
+        radioCr: number,
+    ) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetRadioParams);
         data.writeUInt32LE(radioFreq);
@@ -131,21 +163,21 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetTxPower(txPower) {
+    async sendCommandSetTxPower(txPower: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetTxPower);
         data.writeByte(txPower);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandResetPath(pubKey) {
+    async sendCommandResetPath(pubKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.ResetPath);
         data.writeBytes(pubKey); // 32 bytes
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetAdvertLatLon(lat, lon) {
+    async sendCommandSetAdvertLatLon(lat: number, lon: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetAdvertLatLon);
         data.writeInt32LE(lat);
@@ -153,14 +185,14 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandRemoveContact(pubKey) {
+    async sendCommandRemoveContact(pubKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.RemoveContact);
         data.writeBytes(pubKey); // 32 bytes
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandShareContact(pubKey) {
+    async sendCommandShareContact(pubKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.ShareContact);
         data.writeBytes(pubKey); // 32 bytes
@@ -172,13 +204,13 @@ class Connection extends EventEmitter {
     async sendCommandExportContact(pubKey = null) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.ExportContact);
-        if(pubKey){
+        if (pubKey) {
             data.writeBytes(pubKey); // 32 bytes
         }
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandImportContact(advertPacketBytes) {
+    async sendCommandImportContact(advertPacketBytes: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.ImportContact);
         data.writeBytes(advertPacketBytes); // raw advert packet bytes
@@ -198,7 +230,7 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandDeviceQuery(appTargetVer) {
+    async sendCommandDeviceQuery(appTargetVer: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.DeviceQuery);
         data.writeByte(appTargetVer); // e.g: 1
@@ -211,14 +243,14 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandImportPrivateKey(privateKey) {
+    async sendCommandImportPrivateKey(privateKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.ImportPrivateKey);
         data.writeBytes(privateKey);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendRawData(path, rawData) {
+    async sendCommandSendRawData(path: Uint8Array, rawData: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendRawData);
         data.writeByte(path.length);
@@ -227,7 +259,7 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendLogin(publicKey, password) {
+    async sendCommandSendLogin(publicKey: Uint8Array, password: string) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendLogin);
         data.writeBytes(publicKey); // 32 bytes - id of repeater or room server
@@ -235,14 +267,14 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendStatusReq(publicKey) {
+    async sendCommandSendStatusReq(publicKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendStatusReq);
         data.writeBytes(publicKey); // 32 bytes - id of repeater or room server
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendTelemetryReq(publicKey) {
+    async sendCommandSendTelemetryReq(publicKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendTelemetryReq);
         data.writeByte(0); // reserved
@@ -252,7 +284,7 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendBinaryReq(publicKey, requestCodeAndParams) {
+    async sendCommandSendBinaryReq(publicKey: Uint8Array, requestCodeAndParams: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendBinaryReq);
         data.writeBytes(publicKey); // 32 bytes - public key of contact to send request to
@@ -260,7 +292,7 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetFloodScope(transportKey) {
+    async sendCommandSetFloodScope(transportKey: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetFloodScope);
         data.writeByte(0); // not documented, protocol version 8 checks if it's zero, else returns ERR_CODE_UNSUPPORTED_CMD
@@ -268,14 +300,20 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandGetStats(statsType) {
+    async sendCommandGetStats(statsType: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.GetStats);
         data.writeByte(statsType);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendChannelData(channelIdx, pathLen, path, dataType, payload) {
+    async sendCommandSendChannelData(
+        channelIdx: number,
+        pathLen: number,
+        path: Uint8Array,
+        dataType: number,
+        payload: Uint8Array,
+    ) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendChannelData);
         data.writeByte(channelIdx);
@@ -286,14 +324,14 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandGetChannel(channelIdx) {
+    async sendCommandGetChannel(channelIdx: number) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.GetChannel);
         data.writeByte(channelIdx);
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetChannel(channelIdx, name, secret) {
+    async sendCommandSetChannel(channelIdx: number, name: string, secret: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetChannel);
         data.writeByte(channelIdx);
@@ -308,7 +346,7 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSignData(dataToSign) {
+    async sendCommandSignData(dataToSign: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SignData);
         data.writeBytes(dataToSign);
@@ -321,7 +359,7 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSendTracePath(tag, auth, path) {
+    async sendCommandSendTracePath(tag: number, auth: number, path: Uint8Array) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SendTracePath);
         data.writeUInt32LE(tag);
@@ -331,119 +369,115 @@ class Connection extends EventEmitter {
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    async sendCommandSetOtherParams(manualAddContacts) {
+    async sendCommandSetOtherParams(manualAddContacts: boolean) {
         const data = new BufferWriter();
         data.writeByte(Constants.CommandCodes.SetOtherParams);
-        data.writeByte(manualAddContacts); // 0 or 1
+        data.writeByte(manualAddContacts ? 1 : 0); // 0 or 1
         await this.sendToRadioFrame(data.toBytes());
     }
 
-    onFrameReceived(frame) {
-
+    onFrameReceived(frame: Uint8Array) {
         // emit received frame
         this.emit("rx", frame);
 
         const bufferReader = new BufferReader(frame);
         const responseCode = bufferReader.readByte();
 
-        if(responseCode === Constants.ResponseCodes.Ok){
+        if (responseCode === Constants.ResponseCodes.Ok) {
             this.onOkResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.Err){
+        } else if (responseCode === Constants.ResponseCodes.Err) {
             this.onErrResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.SelfInfo){
+        } else if (responseCode === Constants.ResponseCodes.SelfInfo) {
             this.onSelfInfoResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.CurrTime){
+        } else if (responseCode === Constants.ResponseCodes.CurrTime) {
             this.onCurrTimeResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.NoMoreMessages){
+        } else if (responseCode === Constants.ResponseCodes.NoMoreMessages) {
             this.onNoMoreMessagesResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.ContactMsgRecv){
+        } else if (responseCode === Constants.ResponseCodes.ContactMsgRecv) {
             this.onContactMsgRecvResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.ChannelMsgRecv){
+        } else if (responseCode === Constants.ResponseCodes.ChannelMsgRecv) {
             this.onChannelMsgRecvResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.ContactsStart){
+        } else if (responseCode === Constants.ResponseCodes.ContactsStart) {
             this.onContactsStartResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.Contact){
+        } else if (responseCode === Constants.ResponseCodes.Contact) {
             this.onContactResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.EndOfContacts){
+        } else if (responseCode === Constants.ResponseCodes.EndOfContacts) {
             this.onEndOfContactsResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.Sent){
+        } else if (responseCode === Constants.ResponseCodes.Sent) {
             this.onSentResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.ExportContact){
+        } else if (responseCode === Constants.ResponseCodes.ExportContact) {
             this.onExportContactResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.BatteryVoltage){
+        } else if (responseCode === Constants.ResponseCodes.BatteryVoltage) {
             this.onBatteryVoltageResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.DeviceInfo){
+        } else if (responseCode === Constants.ResponseCodes.DeviceInfo) {
             this.onDeviceInfoResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.PrivateKey){
+        } else if (responseCode === Constants.ResponseCodes.PrivateKey) {
             this.onPrivateKeyResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.Disabled){
+        } else if (responseCode === Constants.ResponseCodes.Disabled) {
             this.onDisabledResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.ChannelInfo){
+        } else if (responseCode === Constants.ResponseCodes.ChannelInfo) {
             this.onChannelInfoResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.SignStart){
+        } else if (responseCode === Constants.ResponseCodes.SignStart) {
             this.onSignStartResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.Signature){
+        } else if (responseCode === Constants.ResponseCodes.Signature) {
             this.onSignatureResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.Stats){
+        } else if (responseCode === Constants.ResponseCodes.Stats) {
             this.onStatsResponse(bufferReader);
-        } else if(responseCode === Constants.ResponseCodes.ChannelDataRecv){
+        } else if (responseCode === Constants.ResponseCodes.ChannelDataRecv) {
             this.onChannelDataRecvResponse(bufferReader);
-        } else if(responseCode === Constants.PushCodes.Advert){
+        } else if (responseCode === Constants.PushCodes.Advert) {
             this.onAdvertPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.PathUpdated){
+        } else if (responseCode === Constants.PushCodes.PathUpdated) {
             this.onPathUpdatedPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.SendConfirmed){
+        } else if (responseCode === Constants.PushCodes.SendConfirmed) {
             this.onSendConfirmedPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.MsgWaiting){
+        } else if (responseCode === Constants.PushCodes.MsgWaiting) {
             this.onMsgWaitingPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.RawData){
+        } else if (responseCode === Constants.PushCodes.RawData) {
             this.onRawDataPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.LoginSuccess){
+        } else if (responseCode === Constants.PushCodes.LoginSuccess) {
             this.onLoginSuccessPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.StatusResponse){
+        } else if (responseCode === Constants.PushCodes.StatusResponse) {
             this.onStatusResponsePush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.LogRxData){
+        } else if (responseCode === Constants.PushCodes.LogRxData) {
             this.onLogRxDataPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.TelemetryResponse){
+        } else if (responseCode === Constants.PushCodes.TelemetryResponse) {
             this.onTelemetryResponsePush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.TraceData){
+        } else if (responseCode === Constants.PushCodes.TraceData) {
             this.onTraceDataPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.NewAdvert){
+        } else if (responseCode === Constants.PushCodes.NewAdvert) {
             this.onNewAdvertPush(bufferReader);
-        } else if(responseCode === Constants.PushCodes.BinaryResponse){
+        } else if (responseCode === Constants.PushCodes.BinaryResponse) {
             this.onBinaryResponsePush(bufferReader);
         } else {
             console.log(`unhandled frame: code=${responseCode}`, frame);
         }
-
     }
 
-    onAdvertPush(bufferReader) {
+    onAdvertPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.Advert, {
             publicKey: bufferReader.readBytes(32),
         });
     }
 
-    onPathUpdatedPush(bufferReader) {
+    onPathUpdatedPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.PathUpdated, {
             publicKey: bufferReader.readBytes(32),
         });
     }
 
-    onSendConfirmedPush(bufferReader) {
+    onSendConfirmedPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.SendConfirmed, {
             ackCode: bufferReader.readUInt32LE(),
             roundTrip: bufferReader.readUInt32LE(),
         });
     }
 
-    onMsgWaitingPush(bufferReader) {
-        this.emit(Constants.PushCodes.MsgWaiting, {
-
-        });
+    onMsgWaitingPush(bufferReader: BufferReader) {
+        this.emit(Constants.PushCodes.MsgWaiting, {});
     }
 
-    onRawDataPush(bufferReader) {
+    onRawDataPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.RawData, {
             lastSnr: bufferReader.readInt8() / 4,
             lastRssi: bufferReader.readInt8(),
@@ -452,14 +486,14 @@ class Connection extends EventEmitter {
         });
     }
 
-    onLoginSuccessPush(bufferReader) {
+    onLoginSuccessPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.LoginSuccess, {
             reserved: bufferReader.readByte(), // reserved
             pubKeyPrefix: bufferReader.readBytes(6), // 6 bytes of public key this login success is from
         });
     }
 
-    onStatusResponsePush(bufferReader) {
+    onStatusResponsePush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.StatusResponse, {
             reserved: bufferReader.readByte(), // reserved
             pubKeyPrefix: bufferReader.readBytes(6), // 6 bytes of public key this status response is from
@@ -467,7 +501,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onLogRxDataPush(bufferReader) {
+    onLogRxDataPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.LogRxData, {
             lastSnr: bufferReader.readInt8() / 4,
             lastRssi: bufferReader.readInt8(),
@@ -475,7 +509,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onTelemetryResponsePush(bufferReader) {
+    onTelemetryResponsePush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.TelemetryResponse, {
             reserved: bufferReader.readByte(), // reserved
             pubKeyPrefix: bufferReader.readBytes(6), // 6 bytes of public key this telemetry response is from
@@ -483,7 +517,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onBinaryResponsePush(bufferReader) {
+    onBinaryResponsePush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.BinaryResponse, {
             reserved: bufferReader.readByte(), // reserved
             tag: bufferReader.readUInt32LE(), // 4 bytes tag
@@ -491,7 +525,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onTraceDataPush(bufferReader) {
+    onTraceDataPush(bufferReader: BufferReader) {
         const reserved = bufferReader.readByte();
         const pathLen = bufferReader.readUInt8();
         this.emit(Constants.PushCodes.TraceData, {
@@ -506,7 +540,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onNewAdvertPush(bufferReader) {
+    onNewAdvertPush(bufferReader: BufferReader) {
         this.emit(Constants.PushCodes.NewAdvert, {
             publicKey: bufferReader.readBytes(32),
             type: bufferReader.readByte(),
@@ -521,26 +555,24 @@ class Connection extends EventEmitter {
         });
     }
 
-    onOkResponse(bufferReader) {
-        this.emit(Constants.ResponseCodes.Ok, {
-
-        });
+    onOkResponse(bufferReader: BufferReader) {
+        this.emit(Constants.ResponseCodes.Ok, {});
     }
 
-    onErrResponse(bufferReader) {
+    onErrResponse(bufferReader: BufferReader) {
         const errCode = bufferReader.getRemainingBytesCount() > 0 ? bufferReader.readByte() : null;
         this.emit(Constants.ResponseCodes.Err, {
             errCode: errCode,
         });
     }
 
-    onContactsStartResponse(bufferReader) {
+    onContactsStartResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.ContactsStart, {
             count: bufferReader.readUInt32LE(),
         });
     }
 
-    onContactResponse(bufferReader) {
+    onContactResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.Contact, {
             publicKey: bufferReader.readBytes(32),
             type: bufferReader.readByte(),
@@ -555,13 +587,13 @@ class Connection extends EventEmitter {
         });
     }
 
-    onEndOfContactsResponse(bufferReader) {
+    onEndOfContactsResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.EndOfContacts, {
             mostRecentLastmod: bufferReader.readUInt32LE(),
         });
     }
 
-    onSentResponse(bufferReader) {
+    onSentResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.Sent, {
             result: bufferReader.readInt8(),
             expectedAckCrc: bufferReader.readUInt32LE(),
@@ -569,19 +601,19 @@ class Connection extends EventEmitter {
         });
     }
 
-    onExportContactResponse(bufferReader) {
+    onExportContactResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.ExportContact, {
             advertPacketBytes: bufferReader.readRemainingBytes(),
         });
     }
 
-    onBatteryVoltageResponse(bufferReader) {
+    onBatteryVoltageResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.BatteryVoltage, {
             batteryMilliVolts: bufferReader.readUInt16LE(),
         });
     }
 
-    onDeviceInfoResponse(bufferReader) {
+    onDeviceInfoResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.DeviceInfo, {
             firmwareVer: bufferReader.readInt8(),
             reserved: bufferReader.readBytes(6), // reserved
@@ -590,26 +622,23 @@ class Connection extends EventEmitter {
         });
     }
 
-    onPrivateKeyResponse(bufferReader) {
+    onPrivateKeyResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.PrivateKey, {
             privateKey: bufferReader.readBytes(64),
         });
     }
 
-    onDisabledResponse(bufferReader) {
-        this.emit(Constants.ResponseCodes.Disabled, {
-
-        });
+    onDisabledResponse(bufferReader: BufferReader) {
+        this.emit(Constants.ResponseCodes.Disabled, {});
     }
 
-    onChannelInfoResponse(bufferReader) {
-
+    onChannelInfoResponse(bufferReader: BufferReader) {
         const idx = bufferReader.readUInt8();
         const name = bufferReader.readCString(32);
         const remainingBytesLength = bufferReader.getRemainingBytesCount();
 
         // 128-bit keys
-        if(remainingBytesLength === 16){
+        if (remainingBytesLength === 16) {
             this.emit(Constants.ResponseCodes.ChannelInfo, {
                 channelIdx: idx,
                 name: name,
@@ -618,36 +647,34 @@ class Connection extends EventEmitter {
         } else {
             console.log(`ChannelInfo has unexpected key length: ${remainingBytesLength}`);
         }
-
     }
 
-    onSignStartResponse(bufferReader) {
+    onSignStartResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.SignStart, {
             reserved: bufferReader.readByte(),
             maxSignDataLen: bufferReader.readUInt32LE(),
         });
     }
 
-    onSignatureResponse(bufferReader) {
+    onSignatureResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.Signature, {
             signature: bufferReader.readBytes(64),
         });
     }
 
-    onStatsResponse(bufferReader) {
-
+    onStatsResponse(bufferReader: BufferReader) {
         const type = bufferReader.readUInt8();
         const raw = bufferReader.readRemainingBytes();
         const rawBufferReader = new BufferReader(raw);
 
         var data = {};
-        if(type === Constants.StatsTypes.Core){
+        if (type === Constants.StatsTypes.Core) {
             data = {
                 batteryMilliVolts: rawBufferReader.readUInt16LE(),
                 uptimeSecs: rawBufferReader.readUInt32LE(),
                 queueLen: rawBufferReader.readUInt8(),
             };
-        } else if(type === Constants.StatsTypes.Radio){
+        } else if (type === Constants.StatsTypes.Radio) {
             data = {
                 noiseFloor: rawBufferReader.readInt16LE(),
                 lastRssi: rawBufferReader.readInt8(),
@@ -655,7 +682,7 @@ class Connection extends EventEmitter {
                 txAirSecs: rawBufferReader.readUInt32LE(),
                 rxAirSecs: rawBufferReader.readUInt32LE(),
             };
-        } else if(type === Constants.StatsTypes.Packets){
+        } else if (type === Constants.StatsTypes.Packets) {
             data = {
                 recv: rawBufferReader.readUInt32LE(),
                 sent: rawBufferReader.readUInt32LE(),
@@ -663,7 +690,10 @@ class Connection extends EventEmitter {
                 nSentDirect: rawBufferReader.readUInt32LE(),
                 nRecvFlood: rawBufferReader.readUInt32LE(),
                 nRecvDirect: rawBufferReader.readUInt32LE(),
-                nRecvErrors: rawBufferReader.getRemainingBytesCount() >= 4 ? rawBufferReader.readUInt32LE() : null,
+                nRecvErrors:
+                    rawBufferReader.getRemainingBytesCount() >= 4
+                        ? rawBufferReader.readUInt32LE()
+                        : null,
             };
         }
 
@@ -672,10 +702,9 @@ class Connection extends EventEmitter {
             raw: raw,
             data: data,
         });
-
     }
 
-    onChannelDataRecvResponse(bufferReader) {
+    onChannelDataRecvResponse(bufferReader: BufferReader) {
         const snr = bufferReader.readInt8() / 4;
         const reserved1 = bufferReader.readByte();
         const reserved2 = bufferReader.readByte();
@@ -696,7 +725,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onSelfInfoResponse(bufferReader) {
+    onSelfInfoResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.SelfInfo, {
             type: bufferReader.readByte(),
             txPower: bufferReader.readByte(),
@@ -714,19 +743,17 @@ class Connection extends EventEmitter {
         });
     }
 
-    onCurrTimeResponse(bufferReader) {
+    onCurrTimeResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.CurrTime, {
             epochSecs: bufferReader.readUInt32LE(),
         });
     }
 
-    onNoMoreMessagesResponse(bufferReader) {
-        this.emit(Constants.ResponseCodes.NoMoreMessages, {
-
-        });
+    onNoMoreMessagesResponse(bufferReader: BufferReader) {
+        this.emit(Constants.ResponseCodes.NoMoreMessages, {});
     }
 
-    onContactMsgRecvResponse(bufferReader) {
+    onContactMsgRecvResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.ContactMsgRecv, {
             pubKeyPrefix: bufferReader.readBytes(6),
             pathLen: bufferReader.readByte(),
@@ -736,7 +763,7 @@ class Connection extends EventEmitter {
         });
     }
 
-    onChannelMsgRecvResponse(bufferReader) {
+    onChannelMsgRecvResponse(bufferReader: BufferReader) {
         this.emit(Constants.ResponseCodes.ChannelMsgRecv, {
             channelIdx: bufferReader.readInt8(), // reserved (0 for now, ie. 'public')
             pathLen: bufferReader.readByte(), // 0xFF if was sent direct, otherwise hop count for flood-mode
@@ -746,42 +773,39 @@ class Connection extends EventEmitter {
         });
     }
 
-    getSelfInfo(timeoutMillis = null) {
+    getSelfInfo(timeoutMillis = null): Promise<SelfInfo> {
         return new Promise(async (resolve, reject) => {
-
             // listen for response
-            this.once(Constants.ResponseCodes.SelfInfo, (selfInfo) => {
+            this.once(Constants.ResponseCodes.SelfInfo, (selfInfo: SelfInfo) => {
                 resolve(selfInfo);
             });
 
             // timeout after provided milliseconds if device did not respond
-            if(timeoutMillis != null){
+            if (timeoutMillis != null) {
                 setTimeout(reject, timeoutMillis);
             }
 
             // request self info
             await this.sendCommandAppStart();
-
         });
     }
 
-    async sendAdvert(type) {
-        return new Promise(async (resolve, reject) => {
+    async sendAdvert(type: number): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -789,8 +813,7 @@ class Connection extends EventEmitter {
 
                 // send advert
                 await this.sendCommandSendSelfAdvert(type);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
@@ -804,23 +827,22 @@ class Connection extends EventEmitter {
         return await this.sendAdvert(Constants.SelfAdvertTypes.ZeroHop);
     }
 
-    setAdvertName(name) {
-        return new Promise(async (resolve, reject) => {
+    setAdvertName(name: string): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -828,30 +850,28 @@ class Connection extends EventEmitter {
 
                 // set advert name
                 await this.sendCommandSetAdvertName(name);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setAdvertLatLong(latitude, longitude) {
-        return new Promise(async (resolve, reject) => {
+    setAdvertLatLong(latitude: number, longitude: number): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -859,30 +879,28 @@ class Connection extends EventEmitter {
 
                 // set advert lat lon
                 await this.sendCommandSetAdvertLatLon(latitude, longitude);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setTxPower(txPower) {
-        return new Promise(async (resolve, reject) => {
+    setTxPower(txPower: number): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -890,30 +908,33 @@ class Connection extends EventEmitter {
 
                 // set tx power
                 await this.sendCommandSetTxPower(txPower);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setRadioParams(radioFreq, radioBw, radioSf, radioCr) {
-        return new Promise(async (resolve, reject) => {
+    setRadioParams(
+        radioFreq: number,
+        radioBw: number,
+        radioSf: number,
+        radioCr: number,
+    ): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -921,21 +942,19 @@ class Connection extends EventEmitter {
 
                 // set tx power
                 await this.sendCommandSetRadioParams(radioFreq, radioBw, radioSf, radioCr);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    getContacts() {
-        return new Promise(async (resolve, reject) => {
-
+    getContacts(): Promise<Contact[]> {
+        return new Promise<Contact[]>(async (resolve, reject) => {
             // add contacts we receive to a list
-            const contacts = [];
-            const onContactReceived = (contact) => {
+            const contacts: Contact[] = [];
+            const onContactReceived = (contact: Contact) => {
                 contacts.push(contact);
-            }
+            };
 
             // listen for contacts
             this.on(Constants.ResponseCodes.Contact, onContactReceived);
@@ -948,12 +967,10 @@ class Connection extends EventEmitter {
 
             // request contacts from device
             await this.sendCommandGetContacts();
-
         });
     }
 
-    async findContactByName(name) {
-
+    async findContactByName(name: string): Promise<Contact | undefined> {
         // get contacts
         const contacts = await this.getContacts();
 
@@ -961,11 +978,9 @@ class Connection extends EventEmitter {
         return contacts.find((contact) => {
             return contact.advName === name;
         });
-
     }
 
-    async findContactByPublicKeyPrefix(pubKeyPrefix) {
-
+    async findContactByPublicKeyPrefix(pubKeyPrefix: Uint8Array): Promise<Contact | undefined> {
         // get contacts
         const contacts = await this.getContacts();
 
@@ -974,26 +989,28 @@ class Connection extends EventEmitter {
             const contactPubKeyPrefix = contact.publicKey.subarray(0, pubKeyPrefix.length);
             return BufferUtils.areBuffersEqual(pubKeyPrefix, contactPubKeyPrefix);
         });
-
     }
 
-    sendTextMessage(contactPublicKey, text, type) {
-        return new Promise(async (resolve, reject) => {
+    sendTextMessage(
+        contactPublicKey: Uint8Array,
+        text: string,
+        type?: number,
+    ): Promise<SendMessageResult> {
+        return new Promise<SendMessageResult>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive sent response
-                const onSent = (response) => {
+                const onSent = (response: SendMessageResult) => {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Sent, onSent);
@@ -1005,31 +1022,35 @@ class Connection extends EventEmitter {
                 const senderTimestamp = Math.floor(Date.now() / 1000);
 
                 // send message
-                await this.sendCommandSendTxtMsg(txtType, attempt, senderTimestamp, contactPublicKey, text);
-
-            } catch(e) {
+                await this.sendCommandSendTxtMsg(
+                    txtType,
+                    attempt,
+                    senderTimestamp,
+                    contactPublicKey,
+                    text,
+                );
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    sendChannelTextMessage(channelIdx, text) {
-        return new Promise(async (resolve, reject) => {
+    sendChannelTextMessage(channelIdx: number, text: string): Promise<SendMessageResult> {
+        return new Promise<SendMessageResult>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = () => {
+                const onOk = (response: SendMessageResult) => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    resolve();
-                }
+                    resolve(response);
+                };
 
                 // reject promise when we receive err
-                const onErr = () => {
+                const onErr = (error: any) => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    reject();
-                }
+                    reject(error);
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1041,18 +1062,16 @@ class Connection extends EventEmitter {
 
                 // send message
                 await this.sendCommandSendChannelTxtMsg(txtType, channelIdx, senderTimestamp, text);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    syncNextMessage() {
+    private syncNextMessage() {
         return new Promise(async (resolve, reject) => {
-
             // resolve promise when we receive a contact message
-            const onContactMessageReceived = (message) => {
+            const onContactMessageReceived = (message: WaitingMessage["contactMessage"]) => {
                 this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
@@ -1060,10 +1079,10 @@ class Connection extends EventEmitter {
                 resolve({
                     contactMessage: message,
                 });
-            }
+            };
 
             // resolve promise when we receive a channel message
-            const onChannelMessageReceived = (message) => {
+            const onChannelMessageReceived = (message: WaitingMessage["channelMessage"]) => {
                 this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
@@ -1071,10 +1090,10 @@ class Connection extends EventEmitter {
                 resolve({
                     channelMessage: message,
                 });
-            }
+            };
 
             // resolve promise when we receive channel data
-            const onChannelDataReceived = (message) => {
+            const onChannelDataReceived = (message: WaitingMessage["channelData"]) => {
                 this.off(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelMsgRecv, onChannelMessageReceived);
                 this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
@@ -1082,7 +1101,7 @@ class Connection extends EventEmitter {
                 resolve({
                     channelData: message,
                 });
-            }
+            };
 
             // resolve promise when we have no more messages to receive
             const onNoMoreMessagesReceived = () => {
@@ -1091,7 +1110,7 @@ class Connection extends EventEmitter {
                 this.off(Constants.ResponseCodes.ChannelDataRecv, onChannelDataReceived);
                 this.off(Constants.ResponseCodes.NoMoreMessages, onNoMoreMessagesReceived);
                 resolve(null);
-            }
+            };
 
             // listen for events
             this.once(Constants.ResponseCodes.ContactMsgRecv, onContactMessageReceived);
@@ -1101,48 +1120,42 @@ class Connection extends EventEmitter {
 
             // sync next message from device
             await this.sendCommandSyncNextMessage();
-
         });
     }
 
-    async getWaitingMessages() {
-
+    async getWaitingMessages(): Promise<WaitingMessage[]> {
         const waitingMessages = [];
 
-        while(true){
-
+        while (true) {
             // get next message, otherwise stop if nothing is returned
             const message = await this.syncNextMessage();
-            if(!message){
+            if (!message) {
                 break;
             }
 
             // add to waiting messages list
             waitingMessages.push(message);
-
         }
 
         return waitingMessages;
-
     }
 
-    getDeviceTime() {
+    getDeviceTime(): Promise<{ epochSecs: number }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive sent response
-                const onCurrTime = (response) => {
+                const onCurrTime = (response: { epochSecs: number }) => {
                     this.off(Constants.ResponseCodes.CurrTime, onCurrTime);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
-                const onErr = () => {
+                const onErr = (error: any) => {
                     this.off(Constants.ResponseCodes.CurrTime, onCurrTime);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    reject();
-                }
+                    reject(error);
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.CurrTime, onCurrTime);
@@ -1150,30 +1163,28 @@ class Connection extends EventEmitter {
 
                 // get device time
                 await this.sendCommandGetDeviceTime();
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setDeviceTime(epochSecs) {
+    private setDeviceTime(epochSecs: number): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = (response) => {
+                const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    resolve(response);
-                }
+                    resolve();
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1181,34 +1192,32 @@ class Connection extends EventEmitter {
 
                 // set device time
                 await this.sendCommandSetDeviceTime(epochSecs);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    async syncDeviceTime() {
-        await this.setDeviceTime(Math.floor(Date.now() / 1000));
+    async syncDeviceTime(): Promise<void> {
+        return await this.setDeviceTime(Math.floor(Date.now() / 1000));
     }
 
-    importContact(advertPacketBytes) {
+    importContact(advertPacketBytes: Uint8Array): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = (response) => {
+                const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    resolve(response);
-                }
+                    resolve();
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1216,30 +1225,30 @@ class Connection extends EventEmitter {
 
                 // import contact
                 await this.sendCommandImportContact(advertPacketBytes);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    exportContact(pubKey = null) {
+    exportContact(pubKey = null): Promise<{
+        advertPacketBytes: Uint8Array;
+    }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive export contact response
-                const onExportContact = (response) => {
+                const onExportContact = (response: { advertPacketBytes: Uint8Array }) => {
                     this.off(Constants.ResponseCodes.ExportContact, onExportContact);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.ExportContact, onExportContact);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.ExportContact, onExportContact);
@@ -1247,30 +1256,28 @@ class Connection extends EventEmitter {
 
                 // export contact
                 await this.sendCommandExportContact(pubKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    shareContact(pubKey) {
+    shareContact(pubKey: Contact["publicKey"]) {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = (response) => {
+                const onOk = (response: { advertPacketBytes: Uint8Array }) => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1278,30 +1285,28 @@ class Connection extends EventEmitter {
 
                 // share contact
                 await this.sendCommandShareContact(pubKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    removeContact(pubKey) {
-        return new Promise(async (resolve, reject) => {
+    removeContact(pubKey: Contact["publicKey"]): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1309,54 +1314,70 @@ class Connection extends EventEmitter {
 
                 // remove contact
                 await this.sendCommandRemoveContact(pubKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    addOrUpdateContact(publicKey, type, flags, outPathLen, outPath, advName, lastAdvert, advLat, advLon) {
+    addOrUpdateContact(
+        publicKey: Contact["publicKey"],
+        type: Contact["type"],
+        flags: Contact["flags"],
+        outPathLen: Contact["outPathLen"],
+        outPath: Contact["outPath"],
+        advName: Contact["advName"],
+        lastAdvert: Contact["lastAdvert"],
+        advLat: Contact["advLat"],
+        advLon: Contact["advLon"],
+    ): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
                 this.once(Constants.ResponseCodes.Err, onErr);
 
                 // add or update contact
-                await this.sendCommandAddUpdateContact(publicKey, type, flags, outPathLen, outPath, advName, lastAdvert, advLat, advLon);
-
-            } catch(e) {
+                await this.sendCommandAddUpdateContact(
+                    publicKey,
+                    type,
+                    flags,
+                    outPathLen,
+                    outPath,
+                    advName,
+                    lastAdvert,
+                    advLat,
+                    advLon,
+                );
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setContactPath(contact, path) {
+    setContactPath(contact: Contact, path: Contact["outPath"]): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // create empty out path
                 const maxPathLength = 64;
                 const outPath = new Uint8Array(maxPathLength);
 
                 // fill out path with the provided path
-                for(var i = 0; i < path.length && i < maxPathLength; i++){
+                for (var i = 0; i < path.length && i < maxPathLength; i++) {
                     outPath[i] = path[i];
                 }
 
@@ -1365,31 +1386,39 @@ class Connection extends EventEmitter {
                 contact.outPath = outPath;
 
                 // update contact
-                return await this.addOrUpdateContact(contact.publicKey, contact.type, contact.flags, contact.outPathLen, contact.outPath, contact.advName, contact.lastAdvert, contact.advLat, contact.advLon);
-
-            } catch(e) {
+                return await this.addOrUpdateContact(
+                    contact.publicKey,
+                    contact.type,
+                    contact.flags,
+                    contact.outPathLen,
+                    contact.outPath,
+                    contact.advName,
+                    contact.lastAdvert,
+                    contact.advLat,
+                    contact.advLon,
+                );
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    resetPath(pubKey) {
+    resetPath(pubKey: Contact["publicKey"]): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1397,22 +1426,20 @@ class Connection extends EventEmitter {
 
                 // reset path
                 await this.sendCommandResetPath(pubKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    reboot() {
+    reboot(): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // assume device rebooted after a short delay
                 setTimeout(() => {
@@ -1425,30 +1452,28 @@ class Connection extends EventEmitter {
 
                 // reboot
                 await this.sendCommandReboot();
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    getBatteryVoltage() {
+    getBatteryVoltage(): Promise<{ batteryMilliVolts: number }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive battery voltage
-                const onBatteryVoltage = (response) => {
+                const onBatteryVoltage = (response: { batteryMilliVolts: number }) => {
                     this.off(Constants.ResponseCodes.BatteryVoltage, onBatteryVoltage);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.BatteryVoltage, onBatteryVoltage);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.BatteryVoltage, onBatteryVoltage);
@@ -1456,30 +1481,28 @@ class Connection extends EventEmitter {
 
                 // get battery voltage
                 await this.sendCommandGetBatteryVoltage();
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    deviceQuery(appTargetVer) {
-        return new Promise(async (resolve, reject) => {
+    deviceQuery(appTargetVer: number): Promise<DeviceInfo> {
+        return new Promise<DeviceInfo>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive device info
-                const onDeviceInfo = (response) => {
+                const onDeviceInfo = (response: DeviceInfo) => {
                     this.off(Constants.ResponseCodes.DeviceInfo, onDeviceInfo);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.DeviceInfo, onDeviceInfo);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.DeviceInfo, onDeviceInfo);
@@ -1487,24 +1510,24 @@ class Connection extends EventEmitter {
 
                 // query device
                 await this.sendCommandDeviceQuery(appTargetVer);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    exportPrivateKey() {
+    exportPrivateKey(): Promise<{
+        privateKey: Uint8Array;
+    }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive private Key
-                const onPrivateKey = (response) => {
+                const onPrivateKey = (response: { privateKey: Uint8Array }) => {
                     this.off(Constants.ResponseCodes.PrivateKey, onPrivateKey);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.Disabled, onDisabled);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
@@ -1512,7 +1535,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.Disabled, onDisabled);
                     reject();
-                }
+                };
 
                 // reject promise when we receive disabled
                 const onDisabled = () => {
@@ -1520,7 +1543,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.Disabled, onDisabled);
                     reject("disabled");
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.PrivateKey, onPrivateKey);
@@ -1529,24 +1552,22 @@ class Connection extends EventEmitter {
 
                 // export private key
                 await this.sendCommandExportPrivateKey();
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    importPrivateKey(privateKey) {
-        return new Promise(async (resolve, reject) => {
+    importPrivateKey(privateKey: Uint8Array): Promise<void> {
+        return new Promise<void>(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = (response) => {
+                const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.Disabled, onDisabled);
-                    resolve(response);
-                }
+                    resolve();
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
@@ -1554,7 +1575,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.Disabled, onDisabled);
                     reject();
-                }
+                };
 
                 // reject promise when we receive disabled
                 const onDisabled = () => {
@@ -1562,7 +1583,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.Disabled, onDisabled);
                     reject("disabled");
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1571,24 +1592,28 @@ class Connection extends EventEmitter {
 
                 // import private key
                 await this.sendCommandImportPrivateKey(privateKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    login(contactPublicKey, password, extraTimeoutMillis = 1000) {
+    login(
+        contactPublicKey: Contact["publicKey"],
+        password: string = "",
+        extraTimeoutMillis = 1000,
+    ): Promise<{
+        reserved: number;
+        pubKeyPrefix: Uint8Array;
+    }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // get public key prefix we expect in the login response
                 const publicKeyPrefix = contactPublicKey.subarray(0, 6);
 
                 // listen for sent response so we can get estimated timeout
-                var timeoutHandler = null;
-                const onSent = (response) => {
-
+                var timeoutHandler: number | undefined = undefined;
+                const onSent = (response: { estTimeout: number }) => {
                     // remove error listener since we received sent response
                     this.off(Constants.ResponseCodes.Err, onErr);
 
@@ -1600,14 +1625,15 @@ class Connection extends EventEmitter {
                         this.off(Constants.PushCodes.LoginSuccess, onLoginSuccess);
                         reject("timeout");
                     }, estTimeout);
-
-                }
+                };
 
                 // resolve promise when we receive login success push code
-                const onLoginSuccess = (response) => {
-
+                const onLoginSuccess = (response: {
+                    reserved: number;
+                    pubKeyPrefix: Uint8Array;
+                }) => {
                     // make sure login success response is for this login request
-                    if(!BufferUtils.areBuffersEqual(publicKeyPrefix, response.pubKeyPrefix)){
+                    if (!BufferUtils.areBuffersEqual(publicKeyPrefix, response.pubKeyPrefix)) {
                         console.log("onLoginSuccess is not for this login request, ignoring...");
                         return;
                     }
@@ -1618,8 +1644,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.PushCodes.LoginSuccess, onLoginSuccess);
                     resolve(response);
-
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
@@ -1628,7 +1653,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.PushCodes.LoginSuccess, onLoginSuccess);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Err, onErr);
@@ -1637,24 +1662,24 @@ class Connection extends EventEmitter {
 
                 // login
                 await this.sendCommandSendLogin(contactPublicKey, password);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    getStatus(contactPublicKey, extraTimeoutMillis = 1000) {
-        return new Promise(async (resolve, reject) => {
+    getStatus(
+        contactPublicKey: Contact["publicKey"],
+        extraTimeoutMillis = 1000,
+    ): Promise<StatusResult> {
+        return new Promise<StatusResult>(async (resolve, reject) => {
             try {
-
                 // get public key prefix we expect in the status response
                 const publicKeyPrefix = contactPublicKey.subarray(0, 6);
 
                 // listen for sent response so we can get estimated timeout
-                var timeoutHandler = null;
-                const onSent = (response) => {
-
+                var timeoutHandler: number | undefined = undefined;
+                const onSent = (response: { estTimeout: number }) => {
                     // remove error listener since we received sent response
                     this.off(Constants.ResponseCodes.Err, onErr);
 
@@ -1666,15 +1691,19 @@ class Connection extends EventEmitter {
                         this.off(Constants.PushCodes.StatusResponse, onStatusResponsePush);
                         reject("timeout");
                     }, estTimeout);
-
-                }
+                };
 
                 // resolve promise when we receive status response push code
-                const onStatusResponsePush = (response) => {
-
+                const onStatusResponsePush = (response: {
+                    reserved: number;
+                    pubKeyPrefix: Uint8Array;
+                    statusData: Uint8Array;
+                }) => {
                     // make sure login success response is for this login request
-                    if(!BufferUtils.areBuffersEqual(publicKeyPrefix, response.pubKeyPrefix)){
-                        console.log("onStatusResponsePush is not for this status request, ignoring...");
+                    if (!BufferUtils.areBuffersEqual(publicKeyPrefix, response.pubKeyPrefix)) {
+                        console.log(
+                            "onStatusResponsePush is not for this status request, ignoring...",
+                        );
                         return;
                     }
 
@@ -1703,11 +1732,10 @@ class Connection extends EventEmitter {
                         last_snr: bufferReader.readInt16LE(), // int16_t last_snr
                         n_direct_dups: bufferReader.readUInt16LE(), // uint16_t n_direct_dups
                         n_flood_dups: bufferReader.readUInt16LE(), // uint16_t n_flood_dups
-                    }
+                    };
 
                     resolve(repeaterStats);
-
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
@@ -1716,7 +1744,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.PushCodes.StatusResponse, onStatusResponsePush);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Err, onErr);
@@ -1725,24 +1753,28 @@ class Connection extends EventEmitter {
 
                 // request status
                 await this.sendCommandSendStatusReq(contactPublicKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    getTelemetry(contactPublicKey, extraTimeoutMillis = 1000) {
+    getTelemetry(
+        contactPublicKey: Contact["publicKey"],
+        extraTimeoutMillis = 1000,
+    ): Promise<{
+        reserved: number;
+        pubKeyPrefix: Uint8Array;
+        lppSensorData: Uint8Array;
+    }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // get public key prefix we expect in the telemetry response
                 const publicKeyPrefix = contactPublicKey.subarray(0, 6);
 
                 // listen for sent response so we can get estimated timeout
-                var timeoutHandler = null;
-                const onSent = (response) => {
-
+                var timeoutHandler: number | undefined = undefined;
+                const onSent = (response: { estTimeout: number }) => {
                     // remove error listener since we received sent response
                     this.off(Constants.ResponseCodes.Err, onErr);
 
@@ -1754,15 +1786,19 @@ class Connection extends EventEmitter {
                         this.off(Constants.PushCodes.TelemetryResponse, onTelemetryResponsePush);
                         reject("timeout");
                     }, estTimeout);
-
-                }
+                };
 
                 // resolve promise when we receive telemetry response push code
-                const onTelemetryResponsePush = (response) => {
-
+                const onTelemetryResponsePush = (response: {
+                    reserved: number;
+                    pubKeyPrefix: Uint8Array;
+                    lppSensorData: Uint8Array;
+                }) => {
                     // make sure telemetry response is for this telemetry request
-                    if(!BufferUtils.areBuffersEqual(publicKeyPrefix, response.pubKeyPrefix)){
-                        console.log("onTelemetryResponsePush is not for this telemetry request, ignoring...");
+                    if (!BufferUtils.areBuffersEqual(publicKeyPrefix, response.pubKeyPrefix)) {
+                        console.log(
+                            "onTelemetryResponsePush is not for this telemetry request, ignoring...",
+                        );
                         return;
                     }
 
@@ -1773,8 +1809,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.PushCodes.TelemetryResponse, onTelemetryResponsePush);
 
                     resolve(response);
-
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
@@ -1783,7 +1818,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.PushCodes.TelemetryResponse, onTelemetryResponsePush);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Err, onErr);
@@ -1792,24 +1827,25 @@ class Connection extends EventEmitter {
 
                 // request telemetry
                 await this.sendCommandSendTelemetryReq(contactPublicKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    sendBinaryRequest(contactPublicKey, requestCodeAndParams, extraTimeoutMillis = 1000) {
+    sendBinaryRequest(
+        contactPublicKey: Contact["publicKey"],
+        requestCodeAndParams: Uint8Array,
+        extraTimeoutMillis = 1000,
+    ): Promise<Uint8Array> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // we need the tag for this request (provided in sent listener), so we can listen for the response
-                var tag = null;
+                var tag: number | null = null;
 
                 // listen for sent response so we can get estimated timeout
-                var timeoutHandler = null;
-                const onSent = (response) => {
-
+                var timeoutHandler: number | undefined = undefined;
+                const onSent = (response: { expectedAckCrc: number; estTimeout: number }) => {
                     tag = response.expectedAckCrc;
 
                     // remove error listener since we received sent response
@@ -1823,14 +1859,15 @@ class Connection extends EventEmitter {
                         this.off(Constants.PushCodes.BinaryResponse, onBinaryResponsePush);
                         reject("timeout");
                     }, estTimeout);
-
-                }
+                };
 
                 // resolve promise when we receive binary response push code
-                const onBinaryResponsePush = (response) => {
-
+                const onBinaryResponsePush = (response: {
+                    tag: number;
+                    responseData: Uint8Array;
+                }) => {
                     // make sure tag matches
-                    if(tag !== response.tag){
+                    if (tag !== response.tag) {
                         console.log("onBinaryResponse is not for this request tag, ignoring...");
                         return;
                     }
@@ -1842,8 +1879,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.PushCodes.BinaryResponse, onBinaryResponsePush);
 
                     resolve(response.responseData);
-
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
@@ -1852,7 +1888,7 @@ class Connection extends EventEmitter {
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.PushCodes.BinaryResponse, onBinaryResponsePush);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Err, onErr);
@@ -1861,8 +1897,7 @@ class Connection extends EventEmitter {
 
                 // send binary request
                 await this.sendCommandSendBinaryReq(contactPublicKey, requestCodeAndParams);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
@@ -1875,23 +1910,22 @@ class Connection extends EventEmitter {
      * @param transportKey Uint8Array 16-byte transport key, can be derived from first 16 bytes of sha256("#region")
      * @returns {Promise<unknown>}
      */
-    setFloodScope(transportKey) {
+    setFloodScope(transportKey: Uint8Array): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = (response) => {
+                const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    resolve(response);
-                }
+                    resolve();
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1899,37 +1933,33 @@ class Connection extends EventEmitter {
 
                 // send set flood scope
                 await this.sendCommandSetFloodScope(transportKey);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    getStats(statsType) {
+    private getStats(statsType: number) {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive stats
-                const onStats = (response) => {
-
+                const onStats = (response: { type: number }) => {
                     // make sure stats response is for this stats request
-                    if(response.type !== statsType){
+                    if (response.type !== statsType) {
                         return;
                     }
 
                     this.off(Constants.ResponseCodes.Stats, onStats);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Stats, onStats);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Stats, onStats);
@@ -1937,8 +1967,7 @@ class Connection extends EventEmitter {
 
                 // send get stats
                 await this.sendCommandGetStats(statsType);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
@@ -1956,23 +1985,28 @@ class Connection extends EventEmitter {
         return this.getStats(Constants.StatsTypes.Packets);
     }
 
-    sendChannelData(channelIdx, pathLen, path, dataType, payload) {
+    sendChannelData(
+        channelIdx: number,
+        pathLen: number,
+        path: Uint8Array,
+        dataType: number,
+        payload: Uint8Array,
+    ): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
-                const onOk = (response) => {
+                const onOk = (response: void) => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -1980,46 +2014,50 @@ class Connection extends EventEmitter {
 
                 // send channel data
                 await this.sendCommandSendChannelData(channelIdx, pathLen, path, dataType, payload);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    clearFloodScope() {
-        return this.setFloodScope([]);
+    clearFloodScope(): Promise<void> {
+        return this.setFloodScope(new Uint8Array(16));
     }
 
     // @deprecated migrate to using tracePath instead. pingRepeaterZeroHop will be removed in a future update
-    pingRepeaterZeroHop(contactPublicKey, timeoutMillis) {
+    pingRepeaterZeroHop(
+        contactPublicKey: Contact["publicKey"],
+        timeoutMillis: number,
+    ): Promise<{ rtt: number; snr: number; rssi: number }> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // create raw data using custom packet
                 const bufferWriter = new BufferWriter();
                 bufferWriter.writeUInt32LE(Date.now()); // timestamp millis so every ping is unique
-                bufferWriter.writeBytes([0x70, 0x69, 0x6E, 0x67]); // "ping" as bytes
+                bufferWriter.writeBytes([0x70, 0x69, 0x6e, 0x67]); // "ping" as bytes
                 bufferWriter.writeBytes(contactPublicKey.subarray(0, 2)); // 2 bytes from the repeaters public key, so we don't use another repeaters ping response
                 const rawBytes = bufferWriter.toBytes();
 
                 var startMillis = Date.now();
 
                 // resolve promise when we receive expected response
-                const onLogRxDataPush = (response) => {
-
+                const onLogRxDataPush = (response: {
+                    raw: Uint8Array;
+                    lastSnr: number;
+                    lastRssi: number;
+                }) => {
                     // calculate round trip time
                     const endMillis = Date.now();
                     const durationMillis = endMillis - startMillis;
 
                     // parse packet from rx data, and make sure it's expected type
                     const packet = Packet.fromBytes(response.raw);
-                    if(packet.payload_type !== Packet.PAYLOAD_TYPE_RAW_CUSTOM){
+                    if (packet.payload_type !== Packet.PAYLOAD_TYPE_RAW_CUSTOM) {
                         return;
                     }
 
                     // make sure the payload we sent, is the payload we received
-                    if(!BufferUtils.areBuffersEqual(packet.payload, rawBytes)){
+                    if (!BufferUtils.areBuffersEqual(packet.payload, rawBytes)) {
                         return;
                     }
 
@@ -2033,64 +2071,63 @@ class Connection extends EventEmitter {
                         snr: response.lastSnr,
                         rssi: response.lastRssi,
                     });
-
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.PushCodes.LogRxData, onLogRxDataPush);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Err, onErr);
                 this.on(Constants.PushCodes.LogRxData, onLogRxDataPush);
 
                 // check if a timeout was provided
-                if(timeoutMillis != null){
+                if (timeoutMillis != null) {
                     setTimeout(() => {
-
                         // stop listening for events
                         this.off(Constants.ResponseCodes.Err, onErr);
                         this.off(Constants.PushCodes.LogRxData, onLogRxDataPush);
 
                         // reject since it timed out
                         reject("timeout");
-
                     }, timeoutMillis);
                 }
 
                 // send raw data to repeater, for it to repeat zero hop
-                await this.sendCommandSendRawData([
-                    // we set the repeater we want to ping as the path
-                    // it should repeat our packet, and we can listen for it
-                    contactPublicKey.subarray(0, 1),
-                ], rawBytes);
-
-            } catch(e) {
+                await this.sendCommandSendRawData(
+                    [
+                        // we set the repeater we want to ping as the path
+                        // it should repeat our packet, and we can listen for it
+                        //@ts-expect-error ???
+                        contactPublicKey.subarray(0, 1),
+                    ],
+                    rawBytes,
+                );
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    getChannel(channelIdx) {
+    getChannel(channelIdx: number): Promise<Channel> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive channel info response
-                const onChannelInfoResponse = (response) => {
+                const onChannelInfoResponse = (response: Channel) => {
                     this.off(Constants.ResponseCodes.ChannelInfo, onChannelInfoResponse);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.ChannelInfo, onChannelInfoResponse);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.ChannelInfo, onChannelInfoResponse);
@@ -2098,30 +2135,28 @@ class Connection extends EventEmitter {
 
                 // get channel
                 await this.sendCommandGetChannel(channelIdx);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setChannel(channelIdx, name, secret) {
+    setChannel(channelIdx: number, name: string, secret: Uint8Array): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -2129,44 +2164,38 @@ class Connection extends EventEmitter {
 
                 // set channel
                 await this.sendCommandSetChannel(channelIdx, name, secret);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    async deleteChannel(channelIdx) {
+    async deleteChannel(channelIdx: number): Promise<void> {
         return await this.setChannel(channelIdx, "", new Uint8Array(16));
     }
 
-    getChannels() {
+    getChannels(): Promise<Channel[]> {
         return new Promise(async (resolve, reject) => {
-
             // get channels until we get an error
             var channelIdx = 0;
             const channels = [];
-            while(true){
-
+            while (true) {
                 // try to get next channel
                 try {
                     const channel = await this.getChannel(channelIdx);
                     channels.push(channel);
-                } catch(e){
+                } catch (e) {
                     break;
                 }
 
                 channelIdx++;
-
             }
 
             return resolve(channels);
-
         });
     }
 
-    async findChannelByName(name) {
-
+    async findChannelByName(name: string): Promise<Channel | undefined> {
         // get channels
         const channels = await this.getChannels();
 
@@ -2174,11 +2203,9 @@ class Connection extends EventEmitter {
         return channels.find((channel) => {
             return channel.name === name;
         });
-
     }
 
-    async findChannelBySecret(secret) {
-
+    async findChannelBySecret(secret: Uint8Array): Promise<Channel | undefined> {
         // get channels
         const channels = await this.getChannels();
 
@@ -2186,21 +2213,18 @@ class Connection extends EventEmitter {
         return channels.find((channel) => {
             return BufferUtils.areBuffersEqual(secret, channel.secret);
         });
-
     }
 
-    async sign(data) {
+    async sign(data: Uint8Array): Promise<Uint8Array> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 const chunkSize = 128;
                 const bufferReader = new BufferReader(data);
 
-                const sendNextChunk = async () =>  {
-
+                const sendNextChunk = async () => {
                     // get next chunk
                     var chunk;
-                    if(bufferReader.getRemainingBytesCount() >= chunkSize){
+                    if (bufferReader.getRemainingBytesCount() >= chunkSize) {
                         chunk = bufferReader.readBytes(chunkSize);
                     } else {
                         chunk = bufferReader.readRemainingBytes();
@@ -2208,32 +2232,28 @@ class Connection extends EventEmitter {
 
                     // send chunk
                     await this.sendCommandSignData(chunk);
-
-                }
+                };
 
                 // listen for ok to send next chunk
-                const onOk = async (response) => {
-
+                const onOk = async () => {
                     // check if more chunks to send
-                    if(bufferReader.getRemainingBytesCount() > 0){
+                    if (bufferReader.getRemainingBytesCount() > 0) {
                         await sendNextChunk();
                         return;
                     }
 
                     // no more chunks to send, tell device we are done
                     await this.sendCommandSignFinish();
-
-                }
+                };
 
                 // listen for sign start
-                const onSignStart = async (response) => {
-
+                const onSignStart = async (response: { maxSignDataLen: number }) => {
                     this.off(Constants.ResponseCodes.SignStart, onSignStart);
 
                     // check if data to sign is too long
-                    if(bufferReader.getRemainingBytesCount() > response.maxSignDataLen){
-                        this.off(Constants.ResponseCodes.ok, onOk);
-                        this.off(Constants.ResponseCodes.err, onErr);
+                    if (bufferReader.getRemainingBytesCount() > response.maxSignDataLen) {
+                        this.off(Constants.ResponseCodes.Ok, onOk);
+                        this.off(Constants.ResponseCodes.Err, onErr);
                         this.off(Constants.ResponseCodes.SignStart, onSignStart);
                         this.off(Constants.ResponseCodes.Signature, onSignature);
                         reject("data_too_long");
@@ -2242,26 +2262,25 @@ class Connection extends EventEmitter {
 
                     // start first chunk of data
                     await sendNextChunk();
-
-                }
+                };
 
                 // resolve when we receive signature
-                const onSignature = (response) => {
-                    this.off(Constants.ResponseCodes.ok, onOk);
-                    this.off(Constants.ResponseCodes.err, onErr);
+                const onSignature = (response: { signature: Uint8Array }) => {
+                    this.off(Constants.ResponseCodes.Ok, onOk);
+                    this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.SignStart, onSignStart);
                     this.off(Constants.ResponseCodes.Signature, onSignature);
                     resolve(response.signature);
-                }
+                };
 
                 // reject promise when we receive err
-                const onErr = (response) => {
-                    this.off(Constants.ResponseCodes.ok, onOk);
-                    this.off(Constants.ResponseCodes.err, onErr);
+                const onErr = (response: { error: string }) => {
+                    this.off(Constants.ResponseCodes.Ok, onOk);
+                    this.off(Constants.ResponseCodes.Err, onErr);
                     this.off(Constants.ResponseCodes.SignStart, onSignStart);
                     this.off(Constants.ResponseCodes.Signature, onSignature);
                     reject(response);
-                }
+                };
 
                 // listen for events
                 this.on(Constants.ResponseCodes.Ok, onOk);
@@ -2271,24 +2290,21 @@ class Connection extends EventEmitter {
 
                 // request device to start signing data
                 await this.sendCommandSignStart();
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    tracePath(path, extraTimeoutMillis = 0) {
+    tracePath(path: Uint8Array, extraTimeoutMillis = 0) {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // generate a random tag for this trace, so we can listen for the correct response
                 const tag = RandomUtils.getRandomInt(0, 4294967295);
 
                 // listen for sent response so we can get estimated timeout
-                var timeoutHandler = null;
-                const onSent = (response) => {
-
+                var timeoutHandler: number | undefined = undefined;
+                const onSent = (response: { estTimeout: number }) => {
                     // remove error listener since we received sent response
                     this.off(Constants.ResponseCodes.Err, onErr);
 
@@ -2300,14 +2316,12 @@ class Connection extends EventEmitter {
                         this.off(Constants.ResponseCodes.Err, onErr);
                         reject("timeout");
                     }, estTimeout);
-
-                }
+                };
 
                 // resolve promise when we receive trace data
-                const onTraceDataPush = (response) => {
-
+                const onTraceDataPush = (response: { tag: number; traceData: Uint8Array }) => {
                     // make sure tag matches
-                    if(response.tag !== tag){
+                    if (response.tag !== tag) {
                         console.log("ignoring trace data for a different trace request");
                         return;
                     }
@@ -2318,17 +2332,16 @@ class Connection extends EventEmitter {
                     this.off(Constants.PushCodes.TraceData, onTraceDataPush);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve(response);
-
-                }
+                };
 
                 // reject promise when we receive err
-                const onErr = () => {
+                const onErr = (response: { error: string }) => {
                     clearTimeout(timeoutHandler);
                     this.off(Constants.ResponseCodes.Sent, onSent);
                     this.off(Constants.PushCodes.TraceData, onTraceDataPush);
                     this.off(Constants.ResponseCodes.Err, onErr);
-                    reject();
-                }
+                    reject(response.error);
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Sent, onSent);
@@ -2337,30 +2350,28 @@ class Connection extends EventEmitter {
 
                 // trace path
                 await this.sendCommandSendTracePath(tag, 0, path);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    setOtherParams(manualAddContacts) {
+    setOtherParams(manualAddContacts: boolean): Promise<void> {
         return new Promise(async (resolve, reject) => {
             try {
-
                 // resolve promise when we receive ok
                 const onOk = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     resolve();
-                }
+                };
 
                 // reject promise when we receive err
                 const onErr = () => {
                     this.off(Constants.ResponseCodes.Ok, onOk);
                     this.off(Constants.ResponseCodes.Err, onErr);
                     reject();
-                }
+                };
 
                 // listen for events
                 this.once(Constants.ResponseCodes.Ok, onOk);
@@ -2368,31 +2379,30 @@ class Connection extends EventEmitter {
 
                 // set other params
                 await this.sendCommandSetOtherParams(manualAddContacts);
-
-            } catch(e) {
+            } catch (e) {
                 reject(e);
             }
         });
     }
 
-    async setAutoAddContacts() {
-        return await this.setOtherParams(false);
+    async setAutoAddContacts(): Promise<void> {
+        await this.setOtherParams(false);
     }
 
-    async setManualAddContacts() {
-        return await this.setOtherParams(true);
+    async setManualAddContacts(): Promise<void> {
+        await this.setOtherParams(true);
     }
 
     // REQ_TYPE_GET_NEIGHBOURS from Repeater role
     // https://github.com/meshcore-dev/MeshCore/pull/833
     // Repeater must be running firmware v1.9.0+
-    async getNeighbours(publicKey,
+    async getNeighbours(
+        publicKey: Contact["publicKey"],
         count = 10,
         offset = 0,
         orderBy = 0, // 0=newest_to_oldest, 1=oldest_to_newest, 2=strongest_to_weakest, 3=weakest_to_strongest
         pubKeyPrefixLength = 8,
     ) {
-
         // get neighbours:
         // req_data[0] = REQ_TYPE_GET_NEIGHBOURS
         // req_data[1] = request_version=0
@@ -2420,8 +2430,7 @@ class Connection extends EventEmitter {
 
         // parse neighbours list
         const neighbours = [];
-        for(var i = 0; i < resultsCount; i++){
-
+        for (var i = 0; i < resultsCount; i++) {
             // read info
             const publicKeyPrefix = bufferReader.readBytes(pubKeyPrefixLength);
             const heardSecondsAgo = bufferReader.readUInt32LE();
@@ -2433,16 +2442,13 @@ class Connection extends EventEmitter {
                 heardSecondsAgo: heardSecondsAgo,
                 snr: snr,
             });
-
         }
 
         return {
             totalNeighboursCount: totalNeighboursCount,
             neighbours: neighbours,
         };
-
     }
-
 }
 
 export default Connection;
